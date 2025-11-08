@@ -6,31 +6,33 @@ namespace ReTexToolkit.Core.Conversion;
 
 public static class Ps2Alpha
 {
-    public static void ScaleAlpha(string fileName, string inputDir, string outDir)
+    public static async Task<string> ScaleAsync(string fileName, string inputDir, string outDir)
     {
         var inputPath = Path.Combine(inputDir, fileName);
-        var outputPath = Path.Combine(outDir, fileName);
+        using var img = await Image.LoadAsync(inputPath);
 
-        using var img = Image.Load(inputPath);
-        if (img.TryScaleAlpha())
-            img.Save(outputPath);
-        else
-            img.Save(Path.GetFileNameWithoutExtension(fileName) + "_alpha-unchanged" + Path.GetExtension(fileName));
+        var outputPath = img.TryScaleAlpha()
+            ? Path.Combine(outDir, fileName)
+            : Path.GetFileNameWithoutExtension(fileName) + "_alpha-unchanged" + Path.GetExtension(fileName);
+
+        await img.SaveAsync(outputPath);
+        return outputPath;
     }
 
-    public static void UnScaleAlpha(string fileName, string inputDir, string outDir)
+    public static async Task<string> UnScaleAsync(string fileName, string inputDir, string outDir)
     {
         var inputPath = Path.Combine(inputDir, fileName);
-        var outputPath = Path.Combine(outDir, fileName);
+        using var img = await Image.LoadAsync(inputPath);
 
-        using var img = Image.Load(inputPath);
-        if (img.TryUnScaleAlpha())
-            img.Save(outputPath);
-        else
-            img.Save(Path.GetFileNameWithoutExtension(fileName) + "_alpha-unchanged" + Path.GetExtension(fileName));
+        var outputPath = img.TryUnScaleAlpha()
+            ? Path.Combine(outDir, fileName)
+            : Path.GetFileNameWithoutExtension(fileName) + "_alpha-unchanged" + Path.GetExtension(fileName);
+
+        await img.SaveAsync(outputPath);
+        return outputPath;
     }
 
-    public static bool TryScaleAlpha(this Image img)
+    private static bool TryScaleAlpha(this Image img)
     {
         if (img is not Image<Rgba32> image || !IsPs2UnscaledDump(image))
             return false;
@@ -49,9 +51,9 @@ public static class Ps2Alpha
         return true;
     }
 
-    public static bool TryUnScaleAlpha(this Image img) => throw new NotImplementedException();
+    private static bool TryUnScaleAlpha(this Image img) => throw new NotImplementedException();
 
-    public static bool IsPs2UnscaledDump(Image<Rgba32> img)
+    private static bool IsPs2UnscaledDump(Image<Rgba32> img)
     {
         foreach (var memory in img.GetPixelMemoryGroup())
             for (var i = 0; i < memory.Span.Length; i++)

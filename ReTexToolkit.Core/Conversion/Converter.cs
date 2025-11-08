@@ -7,18 +7,19 @@ namespace ReTexToolkit.Core.Conversion;
 
 public static class Converter
 {
-    public static void ToPng(string fileName, string inputDir, string outDir)
+    public static async Task<string> ToPngAsync(string fileName, string inputDir, string outDir)
     {
         var inputPath = Path.Combine(inputDir, fileName);
         var outputPath = Path.Combine(outDir, $"{Path.GetFileNameWithoutExtension(fileName)}.png");
 
         using var pfImg = Pfimage.FromFile(inputPath);
-        ToImage(pfImg).Save(outputPath, new PngEncoder());
+        await ToImage(pfImg).SaveAsync(outputPath, new PngEncoder());
+        return outputPath;
     }
 
-    public static void ToDds(string inputPath, string outputPath) => throw new NotImplementedException();
+    public static async Task<string> ToDds(string inputPath, string outputPath) => throw new NotImplementedException();
 
-    public static Image ToImage(IImage input) =>
+    private static Image ToImage(IImage input) =>
         input.Format switch
         {
             ImageFormat.Rgb8 => FromRgb8(input),

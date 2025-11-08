@@ -12,15 +12,15 @@ public sealed class Program
             Arguments.FuncOpt
         };
 
-        root.SetAction(parseResult =>
+        root.SetAction(async parseResult =>
         {
             var result = new Result();
-            result.Try(() => CommandResolver.Resolve(parseResult));
+            await result.TryAsync(async () => await CommandResolver.ResolveAsync(parseResult));
             if (!result.HasError())
                 return;
 
             foreach (var error in result.Errors)
-                Console.Error.WriteLine(error.Message);
+                await Console.Error.WriteLineAsync(error.Message);
         });
 
         var result = root.Parse(args);

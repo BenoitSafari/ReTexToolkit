@@ -13,10 +13,20 @@ public static class CommandResolver
         // "ps2-alpha-unscale"
     ];
 
-    // TODO: Add logging
-    public static void Resolve(ParseResult parseResult)
+    private static readonly Dictionary<string, (string outDir, FileType type)> FunctionMappings =
+        new()
+        {
+            { "dds-to-png", ("out_png", FileType.Dds) },
+            { "ps2-alpha-scale", ("out_scaled", FileType.Png) }
+            // { "ps2-alpha-unscale", ("out_unscaled", FileType.Png) }
+        };
+
+    private static readonly SemaphoreSlim Throttler = new(Environment.ProcessorCount);
+
+    public static async Task ResolveAsync(ParseResult parseResult)
     {
         var inputValue = parseResult.GetValue(Arguments.InputArg);
+
         if (string.IsNullOrEmpty(inputValue))
             throw new Exception("Input path is required.");
 
@@ -28,15 +38,40 @@ public static class CommandResolver
                 $"Invalid function '{funcValue}'. Valid functions are: {string.Join(", ", ValidFunctions)}"
             );
 
-        if (funcValue is "dds-to-png")
-            foreach (var fileName in FileResolver.ResolveFilesName(inputValue, FileType.Dds))
-                Converter.ToPng(fileName, inputValue, FileResolver.ResolveOutputPath(inputValue, "out_png"));
-        if (funcValue is "ps2-alpha-scale")
-            foreach (var fileName in FileResolver.ResolveFilesName(inputValue, FileType.Png))
-                Ps2Alpha.ScaleAlpha(
-                    fileName,
-                    inputValue,
-                    FileResolver.ResolveOutputPath(inputValue, "out_scaled")
-                );
+        var count = 0;
+        var files = FileResolver.ResolveFilesName(inputValue, FunctionMappings[funcValue].type);
+        var total = files.Length;
+
+        var tasks = FileResolver.ResolveFilesName(inputValue, FunctionMappings[funcValue].type)
+            .Select(async fileName =>
+            {
+                await Throttler.WaitAsync();
+                try
+                {
+                    var output = string.Empty;
+
+                    if (funcValue is "dds-to-png")
+                        output = await Converter.ToPngAsync(
+                            fileName,
+                            inputValue,
+                            FileResolver.ResolveOutputPath(inputValue, "out_png")
+                        );
+                    if (funcValue is "ps2-alpha-scale")
+                        output = await Ps2Alpha.ScaleAsync(
+                            fileName,
+                            inputValue,
+                            FileResolver.ResolveOutputPath(inputValue, "out_scaled")
+                        );
+
+                    var done = Interlocked.Increment(ref count);
+                    System.Console.WriteLine($"[{done}/{total}] SAVED: {Path.GetFileName(output)}");
+                }
+                finally
+                {
+                    Throttler.Release();
+                }
+            });
+
+        await Task.WhenAll(tasks);
     }
 }
